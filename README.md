@@ -8,7 +8,15 @@
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
 [Follow on X](https://x.com/emanueledpt)
 
-Control [Codex](https://openai.com/index/codex/) from your iPhone. Remodex is a local-first open-source bridge + iOS app that keeps the Codex runtime on your Mac and lets your phone connect through a paired secure session.
+Control [Codex](https://openai.com/index/codex/) from your phone. Remodex is a local-first open-source bridge + mobile app that keeps the Codex runtime on your Mac and lets your phone connect through a paired secure session.
+
+This fork adds an **Android port** of the original iOS app, built with Kotlin and Jetpack Compose.
+
+## Download Android APK
+
+[**Download Remodex Android v1.0.0**](https://github.com/EYHN/remodex/releases/download/v1.0.0-android/remodex-android.apk)
+
+> Install the APK, run `remodex up` on your Mac, then scan the QR code from the app to pair.
 
 ## Key App Features
 
@@ -40,17 +48,24 @@ If you want the public-repo distribution model explained clearly, read [SELF_HOS
 
 ## Get the App
 
-Build the iOS app from source in Xcode, install your own signed build on-device, then use the in-app onboarding flow to pair by scanning the QR from `remodex up`.
+**Android**: Download the APK from the [latest release](https://github.com/EYHN/remodex/releases/tag/v1.0.0-android), install it, and pair by scanning the QR from `remodex up`.
+
+**iOS**: Build the iOS app from source in Xcode, install your own signed build on-device, then use the in-app onboarding flow to pair by scanning the QR from `remodex up`.
 
 If you scan the pairing QR with a generic camera or QR reader before installing the app, your device may treat the QR payload as plain text and open a web search instead of pairing.
 
 ## Architecture
 
 ```
-┌──────────────┐       Paired session   ┌───────────────┐       stdin/stdout       ┌─────────────┐
-│  Remodex iOS │ ◄────────────────────► │ remodex (Mac) │ ◄──────────────────────► │ codex       │
-│  app         │    WebSocket bridge    │ bridge        │    JSON-RPC              │ app-server  │
-└──────────────┘                        └───────────────┘                          └─────────────┘
+┌──────────────────┐
+│  Remodex Android │
+│  app             │──┐
+└──────────────────┘  │  Paired session   ┌───────────────┐       stdin/stdout       ┌─────────────┐
+                      ├──────────────────►│ remodex (Mac) │ ◄──────────────────────► │ codex       │
+┌──────────────────┐  │  WebSocket bridge │ bridge        │    JSON-RPC              │ app-server  │
+│  Remodex iOS     │──┘                   └───────────────┘                          └─────────────┘
+│  app             │
+└──────────────────┘
                                                │                                         │
                                                │  AppleScript route bounce                │ JSONL rollout
                                                ▼                                         ▼
@@ -70,13 +85,19 @@ If you scan the pairing QR with a generic camera or QR reader before installing 
 
 ## Repository Structure
 
-This repo contains the local bridge, the iOS app target, and their tests:
+This repo contains the local bridge, the iOS app, the Android app, and their tests:
 
 ```
 ├── phodex-bridge/                # Node.js bridge package used by `remodex`
 │   ├── bin/                      # CLI entrypoints
 │   └── src/                      # Bridge runtime, git/workspace handlers, refresh helpers
-├── CodexMobile/                  # Xcode project root
+├── RemodexAndroid/               # Android app (Kotlin + Jetpack Compose)
+│   └── app/src/main/java/com/remodex/android/
+│       ├── service/              # Connection, sync, crypto, git, and persistence logic
+│       ├── ui/                   # Compose screens: turn, sidebar, settings, scanner, onboarding
+│       ├── data/                 # Models and secure storage
+│       └── di/                   # Hilt dependency injection
+├── CodexMobile/                  # Xcode project root (iOS)
 │   ├── CodexMobile/              # App source target
 │   │   ├── Services/             # Connection, sync, incoming-event, git, and persistence logic
 │   │   ├── Views/                # SwiftUI screens and timeline/sidebar components
@@ -92,9 +113,10 @@ This repo contains the local bridge, the iOS app target, and their tests:
 - **Node.js** v18+
 - **[Codex CLI](https://github.com/openai/codex)** installed and in your PATH
 - **[Codex desktop app](https://openai.com/index/codex/)** (optional — for viewing threads on your Mac)
-- **A signed Remodex iOS build** installed on your iPhone or iPad before scanning the pairing QR
+- **Remodex app** installed on your phone — [Android APK download](https://github.com/EYHN/remodex/releases/tag/v1.0.0-android) or build the iOS app from source in Xcode
 - **macOS** (for desktop refresh features — the core bridge works on any OS)
 - **Xcode 16+** (only if building the iOS app from source)
+- **Android Studio** (only if building the Android app from source)
 
 ## Install the Bridge
 
@@ -423,6 +445,15 @@ This triggers a debounced deep-link bounce (`codex://settings` → `codex://thre
 - **Secure catch-up**: The bridge keeps a bounded local outbound buffer and re-sends missed encrypted messages after a secure reconnect
 - **Codex persistence**: The Codex process stays alive across transient session reconnects during the current bridge run
 - **Graceful shutdown**: SIGINT/SIGTERM cleanly close all connections
+
+## Building the Android App
+
+```sh
+cd RemodexAndroid
+./gradlew assembleRelease
+```
+
+The signed APK will be at `app/build/outputs/apk/release/app-release.apk`. Requires JDK 17+ and Android SDK 35.
 
 ## Building the iOS App
 
