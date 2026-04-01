@@ -16,6 +16,9 @@ struct QRScannerView: View {
     @State private var didCopyBridgeUpdateCommand = false
     @State private var hasCameraPermission = false
     @State private var isCheckingPermission = true
+    @State private var isShowingManualPayloadSheet = false
+    @State private var manualPayloadText = ""
+    @State private var manualPayloadError: String?
 
     init(
         initialBridgeUpdatePrompt: CodexBridgeUpdatePrompt? = nil,
@@ -71,6 +74,19 @@ struct QRScannerView: View {
             Button("OK", role: .cancel) { scannerError = nil }
         } message: {
             Text(scannerError ?? "Invalid QR code")
+        }
+        .sheet(isPresented: $isShowingManualPayloadSheet, onDismiss: {
+            manualPayloadError = nil
+        }) {
+            ManualPairingPayloadSheet(
+                payloadText: $manualPayloadText,
+                errorMessage: $manualPayloadError,
+                onPasteFromClipboard: pastePayloadFromClipboard,
+                onConnect: submitManualPayload,
+                onDismiss: dismissManualPayloadSheet
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
     }
 
@@ -196,8 +212,11 @@ struct QRScannerView: View {
                 .font(AppFont.subheadline(weight: .medium))
                 .foregroundStyle(.white)
 
+            manualPayloadButton
+
             Spacer()
         }
+        .padding(.horizontal, 24)
     }
 
     private var cameraPermissionView: some View {
@@ -222,7 +241,30 @@ struct QRScannerView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
+
+            manualPayloadButton
         }
+    }
+
+    private var manualPayloadButton: some View {
+        Button("Enter Payload Instead") {
+            manualPayloadError = nil
+            isShowingManualPayloadSheet = true
+        }
+        .font(AppFont.body(weight: .semibold))
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .foregroundStyle(.white)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.12))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+        )
+        .buttonStyle(.plain)
+        .accessibilityLabel("Enter pairing payload instead")
     }
 
     // Keeps permission-prompt teardown on the main actor so backing out mid-prompt
@@ -249,17 +291,61 @@ struct QRScannerView: View {
     }
 
     private func handleScanResult(_ code: String, resetScanLock: @escaping () -> Void) {
+        submitPairingCode(code, resetScanLock: resetScanLock)
+    }
+
+    private func submitManualPayload() {
+        let trimmedPayload = manualPayloadText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedPayload.isEmpty else {
+            manualPayloadError = "Paste the pairing payload from Remodex on your Mac."
+            return
+        }
+
+        submitPairingCode(trimmedPayload, isManualEntry: true)
+    }
+
+    private func submitPairingCode(
+        _ code: String,
+        resetScanLock: (() -> Void)? = nil,
+        isManualEntry: Bool = false
+    ) {
         switch validatePairingQRCode(code) {
         case .success(let payload):
+            manualPayloadText = ""
+            manualPayloadError = nil
+            isShowingManualPayloadSheet = false
             onScan(payload)
         case .scanError(let message):
-            scannerError = message
-            resetScanLock()
+            if isManualEntry {
+                manualPayloadError = message
+            } else {
+                scannerError = message
+            }
+            resetScanLock?()
         case .bridgeUpdateRequired(let prompt):
             didCopyBridgeUpdateCommand = false
+            manualPayloadText = ""
+            manualPayloadError = nil
+            isShowingManualPayloadSheet = false
             bridgeUpdatePrompt = prompt
-            resetScanLock()
+            resetScanLock?()
         }
+    }
+
+    private func pastePayloadFromClipboard() {
+        guard let clipboardText = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !clipboardText.isEmpty else {
+            manualPayloadError = "Clipboard does not contain a pairing payload."
+            return
+        }
+
+        manualPayloadError = nil
+        manualPayloadText = clipboardText
+    }
+
+    private func dismissManualPayloadSheet() {
+        manualPayloadError = nil
+        isShowingManualPayloadSheet = false
     }
 }
 
@@ -279,6 +365,95 @@ private extension CodexBridgeUpdatePrompt {
         initialIsCheckingPermission: false,
         onBack: {}
     ) { _ in }
+}
+
+private struct ManualPairingPayloadSheet: View {
+    @Binding var payloadText: String
+    @Binding var errorMessage: String?
+    let onPasteFromClipboard: () -> Void
+    let onConnect: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Pair with payload")
+                        .font(AppFont.title3(weight: .semibold))
+
+                    Text("Paste the full JSON pairing payload from Remodex on your Mac. This uses the same secure pairing flow as the QR code.")
+                        .font(AppFont.body())
+                        .foregroundStyle(.secondary)
+                }
+
+                TextEditor(text: $payloadText)
+                    .font(AppFont.mono(.subheadline))
+                    .textInputAutocapitalization(.never)
+                    .disableAutocorrection(true)
+                    .padding(12)
+                    .frame(minHeight: 180)
+                    .scrollContentBackground(.hidden)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(Color(.secondarySystemFill))
+                    )
+
+                Text("Tip: you can copy the payload from your terminal and paste it here directly.")
+                    .font(AppFont.caption())
+                    .foregroundStyle(.secondary)
+
+                VStack(spacing: 10) {
+                    Button(action: onPasteFromClipboard) {
+                        Text("Paste from Clipboard")
+                            .font(AppFont.body(weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .fill(Color(.secondarySystemFill))
+                            )
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: onConnect) {
+                        Text("Connect")
+                            .font(AppFont.body(weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .foregroundStyle(.white)
+                            .background(.black, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(trimmedPayloadText.isEmpty)
+                    .opacity(trimmedPayloadText.isEmpty ? 0.5 : 1)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .navigationTitle("Manual Pairing")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close", action: onDismiss)
+                }
+            }
+            .alert("Pairing Error", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) {
+                    errorMessage = nil
+                }
+            } message: {
+                Text(errorMessage ?? "Invalid pairing payload")
+            }
+        }
+    }
+
+    private var trimmedPayloadText: String {
+        payloadText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
 // MARK: - Camera Preview UIViewRepresentable

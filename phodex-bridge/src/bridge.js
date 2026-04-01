@@ -23,6 +23,7 @@ const { handleThreadContextRequest } = require("./thread-context-handler");
 const { handleWorkspaceRequest } = require("./workspace-handler");
 const { createNotificationsHandler } = require("./notifications-handler");
 const { createVoiceHandler, resolveVoiceAuth } = require("./voice-handler");
+const { augmentThreadListResult } = require("./subagent-thread-index");
 const {
   composeSanitizedAuthStatusFromSettledResults,
 } = require("./account-status");
@@ -50,6 +51,10 @@ function startBridge({
 } = {}) {
   const config = explicitConfig || readBridgeConfig();
   const relayBaseUrl = config.relayUrl.replace(/\/+$/, "");
+  const advertisedRelayUrl = typeof process.env.REMODEX_ADVERTISED_RELAY_URL === "string"
+    && process.env.REMODEX_ADVERTISED_RELAY_URL.trim()
+    ? process.env.REMODEX_ADVERTISED_RELAY_URL.trim().replace(/\/+$/, "")
+    : relayBaseUrl;
   if (!relayBaseUrl) {
     console.error("[remodex] No relay URL configured.");
     console.error("[remodex] In a source checkout, run ./run-local-remodex.sh or set REMODEX_RELAY.");
@@ -108,6 +113,7 @@ function startBridge({
     "account/login/start",
     "account/login/cancel",
     "account/logout",
+    "thread/list",
   ]);
   const forwardedRequestMethodTTLms = 2 * 60_000;
   const pendingAuthLogin = {
@@ -118,7 +124,7 @@ function startBridge({
   };
   const secureTransport = createBridgeSecureTransport({
     sessionId,
-    relayUrl: relayBaseUrl,
+    relayUrl: advertisedRelayUrl,
     deviceState,
     onTrustedPhoneUpdate(nextDeviceState) {
       deviceState = nextDeviceState;
@@ -389,12 +395,13 @@ function startBridge({
     if (handleBridgeManagedCodexResponse(message)) {
       return;
     }
-    updatePendingAuthLoginFromCodexMessage(message);
-    trackCodexHandshakeState(message);
-    desktopRefresher.handleOutbound(message);
-    pushNotificationTracker.handleOutbound(message);
-    rememberThreadFromMessage("codex", message);
-    secureTransport.queueOutboundApplicationMessage(message, sendRelayWireMessage);
+    const forwardedMessage = maybeAugmentForwardedResponse(message);
+    updatePendingAuthLoginFromCodexMessage(forwardedMessage);
+    trackCodexHandshakeState(forwardedMessage);
+    desktopRefresher.handleOutbound(forwardedMessage);
+    pushNotificationTracker.handleOutbound(forwardedMessage);
+    rememberThreadFromMessage("codex", forwardedMessage);
+    secureTransport.queueOutboundApplicationMessage(forwardedMessage, sendRelayWireMessage);
   });
 
   codex.onClose(() => {
@@ -614,7 +621,31 @@ function startBridge({
     pruneExpiredForwardedRequestMethods();
     forwardedRequestMethodsById.set(String(requestId), {
       method,
+      params: parsed?.params || null,
       createdAt: Date.now(),
+    });
+  }
+
+  function maybeAugmentForwardedResponse(rawMessage) {
+    const parsed = safeParseJSON(rawMessage);
+    const responseId = parsed?.id;
+    if (responseId == null) {
+      return rawMessage;
+    }
+
+    const trackedRequest = forwardedRequestMethodsById.get(String(responseId));
+    if (!trackedRequest || trackedRequest.method !== "thread/list" || !parsed.result) {
+      return rawMessage;
+    }
+
+    const augmentedResult = augmentThreadListResult(parsed.result, trackedRequest.params);
+    if (augmentedResult === parsed.result) {
+      return rawMessage;
+    }
+
+    return JSON.stringify({
+      ...parsed,
+      result: augmentedResult,
     });
   }
 

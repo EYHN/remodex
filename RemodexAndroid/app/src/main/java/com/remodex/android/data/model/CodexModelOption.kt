@@ -23,12 +23,17 @@ data class CodexReasoningEffortOption(
     val reasoningEffort: String,
     val description: String? = null
 ) {
-    val displayLabel: String get() = reasoningEffort.replaceFirstChar { it.uppercase() }
+    val displayLabel: String get() = reasoningEffort.reasoningEffortDisplayLabel()
 }
 
 @Serializable
 enum class CodexServiceTier {
-    @SerialName("fast") FAST
+    @SerialName("fast") FAST;
+
+    val displayLabel: String
+        get() = when (this) {
+            FAST -> "Fast"
+        }
 }
 
 @Serializable
@@ -41,8 +46,24 @@ enum class CodexAccessMode {
         FULL_ACCESS -> "Full Access"
     }
 
-    val approvalPolicy: String get() = when (this) {
-        ON_REQUEST -> "unless-allow-listed"
-        FULL_ACCESS -> "auto-approve"
+    val approvalPolicyCandidates: List<String> get() = when (this) {
+        ON_REQUEST -> listOf("on-request", "onRequest")
+        FULL_ACCESS -> listOf("never")
     }
+
+    val sandboxLegacyValue: String get() = when (this) {
+        ON_REQUEST -> "workspace-write"
+        FULL_ACCESS -> "danger-full-access"
+    }
+}
+
+fun String.reasoningEffortDisplayLabel(): String {
+    return trim()
+        .replace('_', ' ')
+        .replace('-', ' ')
+        .split(' ')
+        .filter { it.isNotBlank() }
+        .joinToString(" ") { part ->
+            part.replaceFirstChar { it.uppercase() }
+        }
 }

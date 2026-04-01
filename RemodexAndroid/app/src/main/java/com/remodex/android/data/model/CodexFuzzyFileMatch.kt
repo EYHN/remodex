@@ -27,3 +27,10 @@ data class CodexSkillMetadata(
     val normalizedName: String
         get() = name.removePrefix("/").lowercase()
 }
+
+@Serializable
+data class CodexTurnSkillMention(
+    val id: String,
+    val name: String? = null,
+    val path: String? = null
+)

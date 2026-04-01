@@ -41,6 +41,13 @@ security_best_practices_report.md
 # Temp files
 $TMP_PLACEHOLDER
 
+# Xcode derived data (alternate casing)
+.deriveddata/
+
+# Exploration / screenshot scratch dirs
+android-explore/
+ios-explore/
+
 # Claude project config (local only)
 .claude/
 

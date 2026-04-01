@@ -53,10 +53,10 @@ class AssistantHandler {
         itemId: String?,
         finalText: String?,
         existingMessages: MutableList<CodexMessage>
-    ) {
+    ): CodexMessage? {
         val key = "${turnId ?: ""}:${itemId ?: ""}"
         val fp = "$threadId:$key:${finalText?.take(50)}"
-        if (fp in completionFingerprints) return
+        if (fp in completionFingerprints) return null
         completionFingerprints.add(fp)
 
         val existing = streamingMessages.remove(key)
@@ -70,25 +70,26 @@ class AssistantHandler {
                     isStreaming = false
                 )
             }
-            return
+            return existingMessages.getOrNull(idx)
         }
 
         // No streaming message found, create a completed one
         if (!finalText.isNullOrBlank()) {
-            existingMessages.add(
-                CodexMessage(
-                    threadId = threadId,
-                    role = CodexMessageRole.ASSISTANT,
-                    kind = CodexMessageKind.CHAT,
-                    text = finalText,
-                    turnId = turnId,
-                    itemId = itemId,
-                    isStreaming = false,
-                    orderIndex = CodexMessageOrderCounter.next(),
-                    deliveryState = CodexMessageDeliveryState.CONFIRMED
-                )
+            val message = CodexMessage(
+                threadId = threadId,
+                role = CodexMessageRole.ASSISTANT,
+                kind = CodexMessageKind.CHAT,
+                text = finalText,
+                turnId = turnId,
+                itemId = itemId,
+                isStreaming = false,
+                orderIndex = CodexMessageOrderCounter.next(),
+                deliveryState = CodexMessageDeliveryState.CONFIRMED
             )
+            existingMessages.add(message)
+            return message
         }
+        return null
     }
 
     fun appendSystemMessage(

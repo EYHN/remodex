@@ -13,6 +13,14 @@ extension Notification.Name {
 }
 
 final class CodexMobileAppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        LookInsideBootstrap.startIfEnabled()
+        return true
+    }
+
     // Forwards the APNs token so CodexService can persist and sync it to the paired Mac bridge.
     func application(
         _ application: UIApplication,

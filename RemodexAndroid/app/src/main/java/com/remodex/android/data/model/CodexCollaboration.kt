@@ -1,10 +1,16 @@
 package com.remodex.android.data.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.util.UUID
 
 @Serializable
 enum class CodexCollaborationModeKind {
-    DEFAULT, PLAN
+    DEFAULT,
+    PLAN;
+
+    val wireValue: String
+        get() = name.lowercase()
 }
 
 @Serializable
@@ -15,21 +21,33 @@ data class CodexPlanState(
 
 @Serializable
 data class CodexPlanStep(
-    val id: String,
+    val id: String = UUID.randomUUID().toString(),
     val step: String,
     val status: CodexPlanStepStatus = CodexPlanStepStatus.PENDING
 )
 
 @Serializable
 enum class CodexPlanStepStatus {
-    PENDING, IN_PROGRESS, COMPLETED
+    @SerialName("pending")
+    PENDING,
+    @SerialName("in_progress")
+    IN_PROGRESS,
+    @SerialName("completed")
+    COMPLETED
 }
 
 @Serializable
 data class CodexStructuredUserInputRequest(
-    val requestID: String,
+    val requestID: JsonValue,
     val questions: List<CodexStructuredUserInputQuestion> = emptyList()
-)
+) {
+    val requestIdKey: String
+        get() = when (requestID) {
+            is JsonValue.StringValue -> requestID.value
+            is JsonValue.IntValue -> requestID.value.toString()
+            else -> requestID.toJsonElement().toString()
+        }
+}
 
 @Serializable
 data class CodexStructuredUserInputQuestion(
@@ -70,15 +88,26 @@ data class CodexSubagentAction(
     }
 
     fun agentRows(): List<CodexSubagentThreadPresentation> {
-        return receiverAgents.mapIndexed { i, agent ->
+        val orderedThreadIds = buildList {
+            receiverThreadIds.forEach { threadId ->
+                if (!threadId.isNullOrBlank() && !contains(threadId)) {
+                    add(threadId)
+                }
+            }
+            receiverAgents.mapNotNullTo(this) { agent ->
+                agent.threadId?.takeIf { it.isNotBlank() && !contains(it) }
+            }
+        }
+
+        return orderedThreadIds.mapIndexed { i, threadId ->
+            val agent = receiverAgents.firstOrNull { it.threadId == threadId }
             val state = agentStates.getOrNull(i)
-            val threadId = receiverThreadIds.getOrNull(i)
             CodexSubagentThreadPresentation(
                 threadId = threadId,
-                agentId = agent.agentId,
-                nickname = agent.nickname,
-                role = agent.role,
-                model = agent.model,
+                agentId = agent?.agentId,
+                nickname = agent?.nickname,
+                role = agent?.role,
+                model = agent?.model,
                 prompt = prompt,
                 fallbackStatus = state?.status,
                 fallbackMessage = state?.message
@@ -89,6 +118,7 @@ data class CodexSubagentAction(
 
 @Serializable
 data class CodexSubagentRef(
+    val threadId: String? = null,
     val agentId: String? = null,
     val nickname: String? = null,
     val role: String? = null,

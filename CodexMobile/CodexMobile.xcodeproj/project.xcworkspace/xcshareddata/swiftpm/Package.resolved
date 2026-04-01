@@ -1,6 +1,24 @@
 {
-  "originHash" : "d75704dc0da1ea3e1658938a08de5235e7831b7e75fe9f3069afbb174daae38f",
+  "originHash" : "e2a994c780f3d4961147ba5b4fdd34b19f7f707fc024bbf789c3b94cf275dd94",
   "pins" : [
+    {
+      "identity" : "lookinside",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Lakr233/LookInside.git",
+      "state" : {
+        "revision" : "0f7b866144115b119cefab14d29f166190b2275c",
+        "version" : "2.1.1"
+      }
+    },
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser.git",
+      "state" : {
+        "revision" : "626b5b7b2f45e1b0b1c6f4a309296d1d21d7311b",
+        "version" : "1.7.1"
+      }
+    },
     {
       "identity" : "swift-concurrency-extras",
       "kind" : "remoteSourceControl",

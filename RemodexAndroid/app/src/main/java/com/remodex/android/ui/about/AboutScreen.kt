@@ -82,7 +82,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 ) {
                     Text(
                         text = """
-iPhone App
+Android App
   |  WebSocket (E2EE)
   v
 Remodex Bridge (Mac)

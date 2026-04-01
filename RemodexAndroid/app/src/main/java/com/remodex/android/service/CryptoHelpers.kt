@@ -153,6 +153,9 @@ class CryptoHelpers {
         return buffer.array()
     }
 
+    fun buildClientAuthTranscript(transcriptBytes: ByteArray): ByteArray =
+        transcriptBytes + encodeLengthPrefixedUtf8("client-auth")
+
     // --- Nonce construction ---
 
     fun buildNonce(sender: String, counter: Long): ByteArray {
@@ -207,6 +210,14 @@ class CryptoHelpers {
 
     fun fromBase64(encoded: String): ByteArray =
         Base64.decode(encoded, Base64.NO_WRAP)
+
+    private fun encodeLengthPrefixedUtf8(value: String): ByteArray {
+        val bytes = value.toByteArray(Charsets.UTF_8)
+        val buffer = ByteBuffer.allocate(4 + bytes.size).order(ByteOrder.BIG_ENDIAN)
+        buffer.putInt(bytes.size)
+        buffer.put(bytes)
+        return buffer.array()
+    }
 
     // --- Trusted session resolve signature ---
 

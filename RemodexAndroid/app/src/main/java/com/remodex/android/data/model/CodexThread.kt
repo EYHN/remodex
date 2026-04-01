@@ -33,6 +33,9 @@ data class CodexThread(
     val isForkedThread: Boolean
         get() = forkedFromThreadId != null
 
+    val isManagedWorktreeProject: Boolean
+        get() = isManagedWorktreeProjectPath(projectKey)
+
     val projectKey: String?
         get() = normalizeProjectPath(cwd)
 
@@ -63,9 +66,34 @@ data class CodexThread(
 
     companion object {
         fun normalizeProjectPath(path: String?): String? {
-            if (path.isNullOrBlank()) return null
-            return path.trimEnd('/')
+            val trimmed = path?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+            if (trimmed == "/") return "/"
+
+            var normalized = trimmed
+            while (normalized.endsWith("/")) {
+                normalized = normalized.dropLast(1)
+            }
+
+            return if (normalized.isEmpty()) "/" else normalized
         }
+
+        private fun codexManagedWorktreeToken(normalizedProjectPath: String?): String? {
+            val path = normalizedProjectPath ?: return null
+            val components = path.split('/').filter { it.isNotEmpty() }
+            val worktreesIndex = components.indexOf("worktrees")
+            if (worktreesIndex <= 0) return null
+            if (components[worktreesIndex - 1] != ".codex") return null
+
+            val tokenIndex = worktreesIndex + 1
+            val token = components.getOrNull(tokenIndex)?.trim().orEmpty()
+            return token.takeIf { it.isNotEmpty() }
+        }
+
+        fun managedWorktreeTokenForProjectPath(path: String?): String? =
+            codexManagedWorktreeToken(normalizeProjectPath(path))
+
+        fun isManagedWorktreeProjectPath(path: String?): Boolean =
+            managedWorktreeTokenForProjectPath(path) != null
 
         fun parseTimestamp(raw: String?): Long {
             if (raw == null) return 0L
@@ -82,10 +110,45 @@ data class CodexThread(
             } catch (_: Exception) { 0L }
         }
 
+        private fun readStringValue(obj: JsonObject?, key: String): String? {
+            val primitive = obj?.get(key) as? JsonPrimitive ?: return null
+            return primitive.contentOrNull?.takeIf { it.isNotBlank() }
+        }
+
+        private fun readThreadIdentity(
+            obj: JsonObject,
+            metadata: JsonObject?,
+            vararg keys: String
+        ): String? {
+            for (key in keys) {
+                readStringValue(obj, key)?.let { return it }
+            }
+
+            for (key in keys) {
+                readStringValue(metadata, key)?.let { return it }
+            }
+
+            return null
+        }
+
         fun fromJson(json: Json, element: JsonElement): CodexThread? {
             if (element !is JsonObject) return null
             val obj = element
             val id = (obj["id"] ?: obj["thread_id"])?.jsonPrimitive?.contentOrNull ?: return null
+            val metadataElement = obj["metadata"]
+            val metadataObject = metadataElement as? JsonObject
+            val syncState = when (
+                (obj["syncState"] ?: obj["sync_state"])?.jsonPrimitive?.contentOrNull
+                    ?.trim()
+                    ?.lowercase()
+            ) {
+                "archivedlocal", "archived_local" -> CodexThreadSyncState.ARCHIVED_LOCAL
+                else -> if ((obj["archived"] ?: obj["is_archived"])?.jsonPrimitive?.booleanOrNull == true) {
+                    CodexThreadSyncState.ARCHIVED_LOCAL
+                } else {
+                    CodexThreadSyncState.LIVE
+                }
+            }
             return CodexThread(
                 id = id,
                 title = (obj["title"] ?: obj["name"])?.jsonPrimitive?.contentOrNull,
@@ -94,14 +157,22 @@ data class CodexThread(
                 createdAtRaw = (obj["created_at"] ?: obj["createdAt"])?.jsonPrimitive?.contentOrNull,
                 updatedAtRaw = (obj["updated_at"] ?: obj["updatedAt"])?.jsonPrimitive?.contentOrNull,
                 cwd = (obj["cwd"] ?: obj["working_directory"])?.jsonPrimitive?.contentOrNull,
-                metadata = obj["metadata"]?.let { JsonValue.from(it) },
-                forkedFromThreadId = (obj["forked_from_thread_id"] ?: obj["forkedFromThreadId"])?.jsonPrimitive?.contentOrNull,
+                metadata = metadataElement?.let { JsonValue.from(it) },
+                forkedFromThreadId = readThreadIdentity(
+                    obj = obj,
+                    metadata = metadataObject,
+                    "forked_from_thread_id",
+                    "forkedFromThreadId",
+                    "forked_from_id",
+                    "forkedFromId"
+                ),
                 parentThreadId = (obj["parent_thread_id"] ?: obj["parentThreadId"])?.jsonPrimitive?.contentOrNull,
                 agentId = (obj["agent_id"] ?: obj["agentId"])?.jsonPrimitive?.contentOrNull,
                 agentNickname = (obj["agent_nickname"] ?: obj["agentNickname"])?.jsonPrimitive?.contentOrNull,
                 agentRole = (obj["agent_role"] ?: obj["agentRole"])?.jsonPrimitive?.contentOrNull,
                 model = obj["model"]?.jsonPrimitive?.contentOrNull,
-                modelProvider = (obj["model_provider"] ?: obj["modelProvider"])?.jsonPrimitive?.contentOrNull
+                modelProvider = (obj["model_provider"] ?: obj["modelProvider"])?.jsonPrimitive?.contentOrNull,
+                syncState = syncState
             )
         }
     }

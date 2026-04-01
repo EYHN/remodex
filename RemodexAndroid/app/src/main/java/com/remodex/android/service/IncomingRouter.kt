@@ -52,7 +52,11 @@ class IncomingRouter(
             }
             "secureReady" -> {
                 val ready = json.decodeFromString(SecureReadyMessage.serializer(), text)
-                secureTransport.processSecureReady(ready)
+                val resumeState = secureTransport.processSecureReady(ready)
+                if (resumeState != null) {
+                    val resumeText = json.encodeToString(SecureResumeState.serializer(), resumeState)
+                    sendRawCallback?.invoke(resumeText)
+                }
             }
             "secureError" -> {
                 val error = json.decodeFromString(SecureErrorMessage.serializer(), text)

@@ -44,7 +44,10 @@ class MessageTransport(
         val deferred = CompletableDeferred<RpcMessage>()
         pendingRequests[requestId] = deferred
 
-        sendRaw(msg)
+        if (!sendRaw(msg)) {
+            pendingRequests.remove(requestId)
+            throw IllegalStateException("Transport unavailable for $method")
+        }
 
         return withTimeout(REQUEST_TIMEOUT_MS) {
             try {
@@ -70,18 +73,28 @@ class MessageTransport(
         sendRaw(msg)
     }
 
-    private fun sendRaw(msg: RpcMessage) {
+    private fun sendRaw(msg: RpcMessage): Boolean {
         val text = json.encodeToString(RpcMessage.serializer(), msg)
 
         if (secureTransport.isEncrypted) {
             val envelope = secureTransport.encryptMessage(text) ?: run {
                 Log.e(TAG, "Failed to encrypt message")
-                return
+                return false
             }
             val envelopeText = json.encodeToString(SecureEnvelope.serializer(), envelope)
-            connectionManager.send(envelopeText)
+            return connectionManager.send(envelopeText)
         } else {
-            connectionManager.send(text)
+            val messageKind = when {
+                msg.isRequest -> "request:${msg.method.orEmpty()}"
+                msg.isNotification -> "notification:${msg.method.orEmpty()}"
+                msg.isResponse -> "response:${msg.requestIdKey.orEmpty()}"
+                else -> "unknown"
+            }
+            Log.w(
+                TAG,
+                "Dropping RPC before secure channel is ready: $messageKind"
+            )
+            return false
         }
     }
 

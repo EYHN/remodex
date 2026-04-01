@@ -1,6 +1,7 @@
 package com.remodex.android.di
 
 import android.content.Context
+import com.remodex.android.data.store.MessagePersistence
 import com.remodex.android.data.store.SecureStore
 import com.remodex.android.service.*
 import dagger.Module
@@ -32,13 +33,20 @@ object AppModule {
         .readTimeout(0, TimeUnit.MILLISECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .connectTimeout(15, TimeUnit.SECONDS)
-        .pingInterval(30, TimeUnit.SECONDS)
+        .pingInterval(5, TimeUnit.SECONDS)
         .build()
 
     @Provides
     @Singleton
     fun provideSecureStore(@ApplicationContext context: Context): SecureStore =
         SecureStore(context)
+
+    @Provides
+    @Singleton
+    fun provideMessagePersistence(
+        @ApplicationContext context: Context,
+        json: Json
+    ): MessagePersistence = MessagePersistence(context, json)
 
     @Provides
     @Singleton
@@ -76,13 +84,18 @@ object AppModule {
     @Singleton
     fun provideCodexService(
         secureStore: SecureStore,
+        messagePersistence: MessagePersistence,
         connectionManager: ConnectionManager,
         secureTransport: SecureTransport,
         messageTransport: MessageTransport,
         historyDecoder: HistoryDecoder,
+        okHttpClient: OkHttpClient,
+        runCompletionNotifier: RunCompletionNotifier,
+        backgroundTurnMonitor: BackgroundTurnMonitor,
         json: Json
     ): CodexService = CodexService(
-        secureStore, connectionManager, secureTransport,
-        messageTransport, historyDecoder, json
+        secureStore, messagePersistence, connectionManager, secureTransport,
+        messageTransport, historyDecoder, okHttpClient, runCompletionNotifier,
+        backgroundTurnMonitor, json
     )
 }

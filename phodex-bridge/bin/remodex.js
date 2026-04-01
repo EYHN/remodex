@@ -18,6 +18,10 @@ const {
   openLastActiveThread,
   watchThreadRollout,
 } = require("../src");
+const {
+  clearPairingSession,
+  writePairingSession,
+} = require("../src/daemon-state");
 const { version } = require("../package.json");
 
 const command = process.argv[2] || "up";
@@ -43,12 +47,12 @@ async function main() {
       return;
     }
 
-    startBridge();
+    startForegroundBridgeWithPairingSession();
     return;
   }
 
   if (command === "run") {
-    startBridge();
+    startForegroundBridgeWithPairingSession();
     return;
   }
 
@@ -125,6 +129,15 @@ async function main() {
     + "remodex reset-pairing | remodex resume | remodex watch [threadId] | remodex --version"
   );
   process.exit(1);
+}
+
+function startForegroundBridgeWithPairingSession() {
+  clearPairingSession({ env: process.env });
+  startBridge({
+    onPairingPayload(pairingPayload) {
+      writePairingSession(pairingPayload, { env: process.env });
+    },
+  });
 }
 
 function assertMacOSCommand(name) {

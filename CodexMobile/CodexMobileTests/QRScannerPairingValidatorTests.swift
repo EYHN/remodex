@@ -55,6 +55,24 @@ final class QRScannerPairingValidatorTests: XCTestCase {
         XCTAssertEqual(payload.relay, "wss://relay.example")
     }
 
+    func testValidPayloadWithSurroundingWhitespaceReturnsSuccess() {
+        let result = validatePairingQRCode(
+            """
+
+            \(pairingQRCode(v: codexPairingQRVersion, expiresAt: 1_900_000_000_000))
+
+            """,
+            now: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+
+        guard case .success(let payload) = result else {
+            return XCTFail("Expected a valid payload when manual paste adds surrounding whitespace.")
+        }
+
+        XCTAssertEqual(payload.sessionId, "session-123")
+        XCTAssertEqual(payload.relay, "wss://relay.example")
+    }
+
     func testExpiredPayloadReturnsScanError() {
         let result = validatePairingQRCode(
             pairingQRCode(

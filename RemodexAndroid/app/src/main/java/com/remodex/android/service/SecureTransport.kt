@@ -17,9 +17,13 @@ class SecureTransport(
 
     private var session: CodexSecureSession? = null
     private var pendingHandshake: CodexPendingHandshake? = null
+    private var lastAppliedBridgeOutboundSeq: Int =
+        secureStore.readString(SecureStore.LAST_APPLIED_BRIDGE_OUTBOUND_SEQ)?.toIntOrNull() ?: 0
 
     private val _state = MutableStateFlow(CodexSecureConnectionState.DISCONNECTED)
     val state: StateFlow<CodexSecureConnectionState> = _state.asStateFlow()
+    private val _lastErrorMessage = MutableStateFlow<String?>(null)
+    val lastErrorMessage: StateFlow<String?> = _lastErrorMessage.asStateFlow()
 
     // --- Phone Identity ---
 
@@ -58,6 +62,11 @@ class SecureTransport(
     // --- Handshake: Step 1 - Build clientHello ---
 
     fun buildClientHello(sessionId: String, handshakeMode: String): SecureClientHello {
+        if (handshakeMode == "qr_bootstrap") {
+            resetReplayState()
+        }
+        _lastErrorMessage.value = null
+
         val identity = getOrCreatePhoneIdentity()
         val ephemeral = crypto.generateX25519KeyPair()
         val clientNonce = crypto.randomBytes(32)
@@ -125,8 +134,8 @@ class SecureTransport(
             return null
         }
 
-        // Sign client auth (transcript || "client-auth")
-        val clientAuthTranscript = transcript + "client-auth".toByteArray(Charsets.UTF_8)
+        // Match the bridge/iOS transcript domain separation: append a length-prefixed label.
+        val clientAuthTranscript = crypto.buildClientAuthTranscript(transcript)
         val phoneSig = crypto.ed25519Sign(pending.phoneIdentityPrivateKey, clientAuthTranscript)
 
         // Derive session keys
@@ -160,16 +169,44 @@ class SecureTransport(
 
     // --- Handshake: Step 3 - Process secureReady ---
 
-    fun processSecureReady(ready: SecureReadyMessage) {
-        Log.d(TAG, "Secure channel established (epoch=${session?.keyEpoch})")
+    fun processSecureReady(ready: SecureReadyMessage): SecureResumeState? {
+        val sess = session ?: run {
+            Log.e(TAG, "No active session for secureReady")
+            _state.value = CodexSecureConnectionState.ERROR
+            return null
+        }
+
+        if (ready.sessionId != null && ready.sessionId != sess.sessionId) {
+            Log.w(TAG, "Ignoring stale secureReady for session=${ready.sessionId}")
+            return null
+        }
+        if (ready.keyEpoch != null && ready.keyEpoch != sess.keyEpoch) {
+            Log.w(TAG, "Ignoring stale secureReady for epoch=${ready.keyEpoch}")
+            return null
+        }
+
+        Log.d(TAG, "Secure channel established (epoch=${sess.keyEpoch})")
         pendingHandshake = null
+        _lastErrorMessage.value = null
         _state.value = CodexSecureConnectionState.CONNECTED_ENCRYPTED
+        return SecureResumeState(
+            sessionId = sess.sessionId,
+            keyEpoch = sess.keyEpoch,
+            lastAppliedBridgeOutboundSeq = lastAppliedBridgeOutboundSeq
+        )
     }
 
     fun processSecureError(error: SecureErrorMessage) {
         Log.e(TAG, "Secure error: ${error.code} - ${error.message}")
         pendingHandshake = null
         session = null
+        _lastErrorMessage.value = when (error.code) {
+            "pairing_expired" -> "Pairing expired. Scan a fresh QR code from your Mac."
+            "phone_not_trusted" -> "This device is not trusted by the current bridge session. Scan a fresh QR code to pair again."
+            "phone_identity_changed" -> "This device identity changed. Scan a fresh QR code from your Mac."
+            else -> error.message?.ifBlank { "Connection failed. Scan a fresh QR code and try again." }
+                ?: "Connection failed. Scan a fresh QR code and try again."
+        }
         _state.value = CodexSecureConnectionState.ERROR
     }
 
@@ -219,6 +256,16 @@ class SecureTransport(
                 sess.lastMacCounter = envelope.counter
             }
             val payload = json.decodeFromString(SecureApplicationPayload.serializer(), String(plaintext, Charsets.UTF_8))
+            payload.bridgeOutboundSeq?.let { bridgeOutboundSeq ->
+                if (bridgeOutboundSeq <= lastAppliedBridgeOutboundSeq) {
+                    return null
+                }
+                lastAppliedBridgeOutboundSeq = bridgeOutboundSeq
+                secureStore.writeString(
+                    SecureStore.LAST_APPLIED_BRIDGE_OUTBOUND_SEQ,
+                    bridgeOutboundSeq.toString()
+                )
+            }
             payload.payloadText
         } catch (e: Exception) {
             Log.e(TAG, "Decrypt failed: ${e.message}")
@@ -258,7 +305,13 @@ class SecureTransport(
     fun reset() {
         session = null
         pendingHandshake = null
+        _lastErrorMessage.value = null
         _state.value = CodexSecureConnectionState.DISCONNECTED
+    }
+
+    private fun resetReplayState() {
+        lastAppliedBridgeOutboundSeq = 0
+        secureStore.deleteValue(SecureStore.LAST_APPLIED_BRIDGE_OUTBOUND_SEQ)
     }
 
     val isEncrypted: Boolean get() = session != null

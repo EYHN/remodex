@@ -28,6 +28,10 @@ class SecureStore(context: Context) {
         prefs.edit().putString(key, value).apply()
     }
 
+    fun writeStringSync(key: String, value: String) {
+        prefs.edit().putString(key, value).commit()
+    }
+
     fun readData(key: String): ByteArray? {
         val encoded = prefs.getString(key, null) ?: return null
         return try { android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP) }
@@ -52,6 +56,10 @@ class SecureStore(context: Context) {
         prefs.edit().remove(key).apply()
     }
 
+    fun deleteValueSync(key: String) {
+        prefs.edit().remove(key).commit()
+    }
+
     fun contains(key: String): Boolean = prefs.contains(key)
 
     companion object Keys {
@@ -62,9 +70,22 @@ class SecureStore(context: Context) {
         const val PUSH_DEVICE_TOKEN = "pushDeviceToken"
         const val PHONE_IDENTITY_STATE = "phoneIdentityState"
         const val TRUSTED_MAC_REGISTRY = "trustedMacRegistry"
+        const val LAST_APPLIED_BRIDGE_OUTBOUND_SEQ = "lastAppliedBridgeOutboundSeq"
+        const val RENAMED_THREAD_NAMES = "renamedThreadNames"
+        const val FORKED_THREAD_ORIGINS = "forkedThreadOrigins"
+        const val THREAD_PROJECT_BINDINGS = "threadProjectBindings"
+        const val LAST_ACTIVE_THREAD_ID = "lastActiveThreadId"
+        const val AI_CHANGE_SET_LEDGER = "aiChangeSetLedger"
+        const val LOCALLY_ARCHIVED_THREAD_IDS = "locallyArchivedThreadIDs"
+        const val LOCALLY_DELETED_THREAD_IDS = "locallyDeletedThreadIDs"
         const val MESSAGE_HISTORY_KEY = "messageHistoryKey"
         const val HAS_SEEN_ONBOARDING = "hasSeenOnboarding"
         const val SELECTED_FONT_STYLE = "selectedFontStyle"
+        const val SELECTED_MODEL_ID = "selectedModelId"
+        const val SELECTED_REASONING_EFFORT = "selectedReasoningEffort"
+        const val SELECTED_SERVICE_TIER = "selectedServiceTier"
         const val SELECTED_ACCESS_MODE = "selectedAccessMode"
+        const val NOTIFICATION_PERMISSION_PROMPTED = "notificationPermissionPrompted"
+        const val SIDEBAR_MAC_NICKNAME_PREFIX = "sidebarMacNickname."
     }
 }
