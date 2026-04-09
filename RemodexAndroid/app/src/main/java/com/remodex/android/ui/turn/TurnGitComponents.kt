@@ -27,10 +27,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-private val TurnGitPillBackground = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.94f)
-private val TurnGitPillBorder = androidx.compose.ui.graphics.Color(0x14000000)
-private val TurnGitPillGray = androidx.compose.ui.graphics.Color(0xFF8E8E93)
-
 /**
  * Compact branch-name chip that opens the branch selector sheet when tapped.
  * Shows a loading spinner while a branch switch is in progress.
@@ -45,15 +41,19 @@ fun TurnGitBranchSelector(
     modifier: Modifier = Modifier
 ) {
     val displayBranch = currentBranch?.trim()?.takeIf { it.isNotEmpty() }
+    val pillContainerColor = composerChromeContainerColor()
+    val pillBorderColor = composerChromeBorderColor()
+    val pillContentColor = composerChromeSecondaryContentColor()
+    val pillShadowElevation = composerChromeShadowElevation()
 
     Surface(
         modifier = modifier.clickable(enabled = enabled && !isSwitching, onClick = onClick),
         shape = RoundedCornerShape(999.dp),
-        color = TurnGitPillBackground,
-        shadowElevation = 8.dp,
+        color = pillContainerColor,
+        shadowElevation = pillShadowElevation,
         border = BorderStroke(
             1.dp,
-            TurnGitPillBorder
+            pillBorderColor
         )
     ) {
         Row(
@@ -65,7 +65,7 @@ fun TurnGitBranchSelector(
                 CircularProgressIndicator(
                     modifier = Modifier.size(14.dp),
                     strokeWidth = 1.5.dp,
-                    color = TurnGitPillGray
+                    color = pillContentColor
                 )
             } else {
                 Icon(
@@ -73,9 +73,9 @@ fun TurnGitBranchSelector(
                     contentDescription = null,
                     modifier = Modifier.size(14.dp),
                     tint = if (enabled) {
-                        TurnGitPillGray
+                        pillContentColor
                     } else {
-                        TurnGitPillGray.copy(alpha = 0.38f)
+                        pillContentColor.copy(alpha = 0.38f)
                     }
                 )
             }
@@ -92,9 +92,9 @@ fun TurnGitBranchSelector(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = if (enabled) {
-                    TurnGitPillGray
+                    pillContentColor
                 } else {
-                    TurnGitPillGray.copy(alpha = 0.38f)
+                    pillContentColor.copy(alpha = 0.38f)
                 }
             )
         }

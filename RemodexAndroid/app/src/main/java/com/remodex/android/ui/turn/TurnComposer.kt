@@ -690,12 +690,12 @@ fun TurnComposer(
             Surface(
                 modifier = Modifier,
                 shape = composerCardShape,
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.985f),
+                color = composerChromeContainerColor(),
                 tonalElevation = 0.dp,
                 shadowElevation = 12.dp,
                 border = androidx.compose.foundation.BorderStroke(
                     1.dp,
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.06f)
+                    composerChromeBorderColor()
                 )
             ) {
                 Column(
