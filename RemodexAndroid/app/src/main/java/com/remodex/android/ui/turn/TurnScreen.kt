@@ -217,13 +217,6 @@ fun TurnScreen(
                 onOpenStatus = { turnVm.isStatusSheetOpen = true }
             )
 
-            if (showTurnConnectionBanner) {
-                TurnConnectionBanner(
-                    text = turnConnectionBannerMessage.orEmpty(),
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                )
-            }
-
             pendingApproval?.let { approval ->
                 ApprovalBanner(
                     approval = approval,
@@ -233,27 +226,41 @@ fun TurnScreen(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            TurnTimeline(
-                threadId = activeThreadId,
-                messages = timelineProjection.messages,
-                isRunning = isRunning,
-                isHistoryLoading = isCurrentThreadHistoryLoading && timelineProjection.messages.isEmpty(),
-                suppressEmptyState = timelineProjection.pinnedPlanMessage != null && timelineProjection.messages.isEmpty(),
-                assistantRevertPresentationForMessage = { message ->
-                    viewModel.assistantRevertPresentation(message, activeThread?.gitWorkingDirectory)
-                },
-                assistantDiffAvailableForMessage = { message ->
-                    viewModel.diffableAIChangeSetForMessage(message) != null
-                },
-                onOpenAssistantDiff = turnVm::openAssistantDiff,
-                onOpenAssistantRevert = { msg -> turnVm.openAssistantRevert(msg, activeThread, context) },
-                onSubmitStructuredUserInput = viewModel::respondToStructuredUserInput,
-                onOpenSubagentThread = { threadId -> viewModel.selectThread(threadId) },
-                onRetryUserMessage = { text, attachments -> viewModel.sendMessage(text, attachments) },
+            Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-            )
+            ) {
+                TurnTimeline(
+                    threadId = activeThreadId,
+                    messages = timelineProjection.messages,
+                    isRunning = isRunning,
+                    isHistoryLoading = isCurrentThreadHistoryLoading && timelineProjection.messages.isEmpty(),
+                    suppressEmptyState = timelineProjection.pinnedPlanMessage != null && timelineProjection.messages.isEmpty(),
+                    assistantRevertPresentationForMessage = { message ->
+                        viewModel.assistantRevertPresentation(message, activeThread?.gitWorkingDirectory)
+                    },
+                    assistantDiffAvailableForMessage = { message ->
+                        viewModel.diffableAIChangeSetForMessage(message) != null
+                    },
+                    onOpenAssistantDiff = turnVm::openAssistantDiff,
+                    onOpenAssistantRevert = { msg -> turnVm.openAssistantRevert(msg, activeThread, context) },
+                    onSubmitStructuredUserInput = viewModel::respondToStructuredUserInput,
+                    onOpenSubagentThread = { threadId -> viewModel.selectThread(threadId) },
+                    onRetryUserMessage = { text, attachments -> viewModel.sendMessage(text, attachments) },
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                // Keep reconnect progress out of normal layout flow so the timeline height stays stable.
+                if (showTurnConnectionBanner) {
+                    TurnConnectionBanner(
+                        text = turnConnectionBannerMessage.orEmpty(),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
+            }
 
             timelineProjection.pinnedPlanMessage?.let { planMessage ->
                 PlanExecutionAccessory(

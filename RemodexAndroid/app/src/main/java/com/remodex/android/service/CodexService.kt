@@ -161,6 +161,7 @@ class CodexService(
     val secureConnectionState: StateFlow<CodexSecureConnectionState> = secureTransport.state
 
     private val activeTurnIdByThread = mutableMapOf<String, String>()
+    private val contextWindowUsageByThread = mutableMapOf<String, ContextWindowUsage>()
     private val aiChangeSetsById = mutableMapOf<String, AIChangeSet>()
     private val aiChangeSetIdByAssistantMessageId = mutableMapOf<String, String>()
     private val aiChangeSetIdByTurnId = mutableMapOf<String, String>()
@@ -931,6 +932,7 @@ class CodexService(
     fun selectThread(threadId: String?) {
         val normalizedThreadId = threadId?.trim()?.takeIf { it.isNotEmpty() }
         _activeThreadId.value = normalizedThreadId
+        _contextWindowUsage.value = normalizedThreadId?.let { contextWindowUsageByThread[it] }
         persistActiveThreadId(normalizedThreadId)
         if (normalizedThreadId != null) {
             requestThreadHistoryLoad(normalizedThreadId)
@@ -1910,6 +1912,9 @@ class CodexService(
                     ?: activeTurnIdByThread.entries.firstOrNull { (_, candidateTurnId) ->
                         normalizedIdentifier(candidateTurnId) == normalizedIdentifier(turnId)
                     }?.key
+                if (usage != null && usageThreadId != null) {
+                    contextWindowUsageByThread[usageThreadId] = usage
+                }
                 if (usage != null && (activeThreadId == null || usageThreadId == null || usageThreadId == activeThreadId)) {
                     _contextWindowUsage.value = usage
                 }
@@ -3609,10 +3614,14 @@ class CodexService(
                 ))
                 val usage = result.result?.objectValue?.get("usage")?.objectValue
                 if (usage != null) {
-                    _contextWindowUsage.value = ContextWindowUsage(
+                    val snapshot = ContextWindowUsage(
                         tokensUsed = usage["tokensUsed"]?.intValue ?: 0,
                         tokenLimit = usage["tokenLimit"]?.intValue ?: 0
                     )
+                    contextWindowUsageByThread[threadId] = snapshot
+                    if (normalizedIdentifier(_activeThreadId.value) == normalizedIdentifier(threadId)) {
+                        _contextWindowUsage.value = snapshot
+                    }
                 }
             } catch (_: Exception) {}
         }

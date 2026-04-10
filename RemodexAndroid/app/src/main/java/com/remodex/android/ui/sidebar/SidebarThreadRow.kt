@@ -3,6 +3,7 @@ package com.remodex.android.ui.sidebar
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +44,7 @@ fun SidebarThreadRow(
     onArchiveThread: () -> Unit,
     onDeleteThread: () -> Unit
 ) {
+    val isDarkTheme = isSystemInDarkTheme()
     // iOS-style: flat rows with only a subtle selected background, no borders
     val containerColor = if (isSelected) {
         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
@@ -53,6 +55,12 @@ fun SidebarThreadRow(
     var isMenuOpen by remember { mutableStateOf(false) }
     var isRenameDialogOpen by remember { mutableStateOf(false) }
     var pendingTitle by remember(thread.displayTitle) { mutableStateOf(thread.displayTitle) }
+    val titleColor = MaterialTheme.colorScheme.onSurface
+    val timestampColor = if (isDarkTheme) {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
     Box(
         modifier = Modifier
@@ -117,6 +125,7 @@ fun SidebarThreadRow(
             Text(
                 text = thread.displayTitle,
                 style = MaterialTheme.typography.bodyLarge,
+                color = titleColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
@@ -128,7 +137,7 @@ fun SidebarThreadRow(
             Text(
                 text = formatRelativeTime(thread.updatedAt),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = timestampColor
             )
 
             // Context menu triggered by long press (iOS-style), no visible "..." button
