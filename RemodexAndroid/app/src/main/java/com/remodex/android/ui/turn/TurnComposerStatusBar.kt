@@ -40,13 +40,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.isSystemInDarkTheme
 import com.remodex.android.data.model.CodexAccessMode
 import com.remodex.android.data.model.ContextWindowUsage
-
-private val StatusPillBackground = Color.White.copy(alpha = 0.94f)
-private val StatusPillBorder = Color(0x14000000)
-private val StatusPillSecondaryGray = Color(0xFF8E8E93)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +62,22 @@ fun TurnComposerStatusBar(
     onOpenStatusSheet: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isDarkTheme = isSystemInDarkTheme()
+    val pillContainerColor = composerChromeContainerColor()
+    val pillBorderColor = composerChromeBorderColor()
+    val pillSecondaryColor = composerChromeSecondaryContentColor()
+    val pillShadowElevation = composerChromeShadowElevation()
+    val contextButtonContainerColor = if (isDarkTheme) {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f)
+    } else {
+        pillContainerColor
+    }
+    val contextButtonBorderColor = if (isDarkTheme) {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+    } else {
+        pillBorderColor
+    }
+
     AnimatedVisibility(
         visible = !isComposerFocused,
         enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
@@ -88,17 +102,25 @@ fun TurnComposerStatusBar(
                             },
                             contentDescription = null,
                             modifier = Modifier.size(14.dp),
-                            tint = StatusPillSecondaryGray
+                            tint = pillSecondaryColor
                         )
                     },
                     label = if (isWorktreeProject) "Worktree" else "Local",
                     enabled = isRuntimeSelectorEnabled,
-                    onClick = onOpenRuntimeActions
+                    onClick = onOpenRuntimeActions,
+                    containerColor = pillContainerColor,
+                    borderColor = pillBorderColor,
+                    contentColor = pillSecondaryColor,
+                    shadowElevation = pillShadowElevation
                 )
 
                 AccessModePill(
                     selectedAccessMode = selectedAccessMode,
-                    onSelectAccessMode = onSelectAccessMode
+                    onSelectAccessMode = onSelectAccessMode,
+                    containerColor = pillContainerColor,
+                    borderColor = pillBorderColor,
+                    secondaryColor = pillSecondaryColor,
+                    shadowElevation = pillShadowElevation
                 )
 
                 currentBranch?.takeIf { it.isNotBlank() }?.let { branch ->
@@ -116,11 +138,11 @@ fun TurnComposerStatusBar(
                 Surface(
                     modifier = Modifier.clickable(onClick = onOpenStatusSheet),
                     shape = RoundedCornerShape(999.dp),
-                    color = StatusPillBackground,
-                    shadowElevation = 8.dp,
+                    color = contextButtonContainerColor,
+                    shadowElevation = pillShadowElevation,
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
-                        StatusPillBorder
+                        contextButtonBorderColor
                     )
                 ) {
                     ContextWindowProgressRing(
@@ -138,24 +160,28 @@ fun TurnComposerStatusBar(
 @Composable
 private fun AccessModePill(
     selectedAccessMode: CodexAccessMode,
-    onSelectAccessMode: (CodexAccessMode) -> Unit
+    onSelectAccessMode: (CodexAccessMode) -> Unit,
+    containerColor: Color,
+    borderColor: Color,
+    secondaryColor: Color,
+    shadowElevation: Dp
 ) {
     var isMenuOpen by remember { mutableStateOf(false) }
     val tint = if (selectedAccessMode == CodexAccessMode.FULL_ACCESS) {
         Color(0xFFD97706)
     } else {
-        StatusPillSecondaryGray
+        secondaryColor
     }
 
     Box {
         Surface(
             modifier = Modifier.clickable { isMenuOpen = true },
             shape = RoundedCornerShape(999.dp),
-            color = StatusPillBackground,
-            shadowElevation = 8.dp,
+            color = containerColor,
+            shadowElevation = shadowElevation,
             border = androidx.compose.foundation.BorderStroke(
                 1.dp,
-                StatusPillBorder
+                borderColor
             )
         ) {
             Row(
@@ -214,7 +240,11 @@ private fun StatusPill(
     icon: @Composable () -> Unit,
     label: String,
     enabled: Boolean = true,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
+    containerColor: Color,
+    borderColor: Color,
+    contentColor: Color,
+    shadowElevation: Dp
 ) {
     Surface(
         modifier = if (onClick != null) {
@@ -223,11 +253,11 @@ private fun StatusPill(
             Modifier
         },
         shape = RoundedCornerShape(999.dp),
-        color = StatusPillBackground,
-        shadowElevation = 8.dp,
+        color = containerColor,
+        shadowElevation = shadowElevation,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            StatusPillBorder
+            borderColor
         )
     ) {
         Row(
@@ -240,7 +270,7 @@ private fun StatusPill(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Medium,
-                color = StatusPillSecondaryGray
+                color = contentColor
             )
         }
     }

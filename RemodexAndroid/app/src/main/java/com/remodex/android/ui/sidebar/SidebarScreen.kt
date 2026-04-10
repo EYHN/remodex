@@ -3,6 +3,7 @@ package com.remodex.android.ui.sidebar
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,9 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.remodex.android.data.model.CodexThreadSyncState
 import com.remodex.android.service.CodexConnectionPhase
 import com.remodex.android.ui.main.ContentViewModel
@@ -120,8 +123,8 @@ fun SidebarScreen(
 
             Text(
                 text = if (isConnected) "Connected to Mac" else "",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
                 maxLines = 1
             )
 
@@ -168,6 +171,32 @@ fun SidebarSearchField(
     query: String,
     onQueryChange: (String) -> Unit
 ) {
+    val isDarkTheme = isSystemInDarkTheme()
+    val searchFieldTextStyle = MaterialTheme.typography.bodyMedium.copy(
+        lineHeight = 18.sp,
+        platformStyle = PlatformTextStyle(includeFontPadding = false)
+    )
+    val searchFieldContainerColor = if (isDarkTheme) {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f)
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+    }
+    val searchFieldBorderColor = if (isDarkTheme) {
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+    } else {
+        Color.Transparent
+    }
+    val searchFieldPlaceholderColor = if (isDarkTheme) {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+    }
+    val searchFieldIconColor = if (isDarkTheme) {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    }
+
     // iOS-style: gray rounded rect with magnifying glass, no outline border
     OutlinedTextField(
         value = query,
@@ -175,12 +204,12 @@ fun SidebarSearchField(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .height(42.dp),
+            .heightIn(min = 56.dp),
         placeholder = {
             Text(
                 "Search conversations",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                style = searchFieldTextStyle,
+                color = searchFieldPlaceholderColor
             )
         },
         leadingIcon = {
@@ -188,17 +217,24 @@ fun SidebarSearchField(
                 imageVector = Icons.Default.Search,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                tint = searchFieldIconColor
             )
         },
         shape = RoundedCornerShape(10.dp),
         singleLine = true,
-        textStyle = MaterialTheme.typography.bodyMedium,
+        textStyle = searchFieldTextStyle,
         colors = OutlinedTextFieldDefaults.colors(
-            unfocusedBorderColor = Color.Transparent,
-            focusedBorderColor = Color.Transparent,
-            unfocusedContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
-            focusedContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+            unfocusedBorderColor = searchFieldBorderColor,
+            focusedBorderColor = searchFieldBorderColor,
+            focusedLeadingIconColor = searchFieldIconColor,
+            unfocusedLeadingIconColor = searchFieldIconColor,
+            focusedPlaceholderColor = searchFieldPlaceholderColor,
+            unfocusedPlaceholderColor = searchFieldPlaceholderColor,
+            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+            cursorColor = MaterialTheme.colorScheme.onSurface,
+            unfocusedContainerColor = searchFieldContainerColor,
+            focusedContainerColor = searchFieldContainerColor
         )
     )
 }
